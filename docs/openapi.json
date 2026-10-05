@@ -1,0 +1,39 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Fuelwise Route & Fuel API", "version": "1.0.0", "description": "US road routes with cost-aware fuel purchases. 500-mile maximum range, 10 mpg, 50-gallon tank. Default initial fuel is 50 gallons; its sunk cost is excluded. Prices are a supplied historical snapshot. City inputs use an offline US gazetteer, coordinates use US Census boundaries. Only verified station locations are eligible. Usually two routing calls on an uncached long trip, one on a short trip, at most three with a repair, and zero on a cache hit."},
+  "servers": [{"url": "http://127.0.0.1:8000"}],
+  "paths": {
+    "/api/routes/": {"post": {
+      "operationId": "planRoute", "summary": "Find a route and fuel-purchase plan",
+      "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RouteRequest"}, "example": {"start": "Chicago, IL", "finish": "Los Angeles, CA", "initial_fuel_gallons": 50}}}},
+      "responses": {
+        "200": {"description": "Verified route with saved map URL and purchase cost", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Trip"}}}},
+        "400": {"$ref": "#/components/responses/BadRequest"},
+        "413": {"description": "Body exceeds 16 KB"}, "415": {"description": "Use application/json"},
+        "422": {"description": "No drivable route or insufficient verified station coverage", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+        "429": {"description": "Application routing queue busy; Retry-After supplied"},
+        "503": {"description": "Provider unavailable or station data not imported; Retry-After supplied"}
+      }
+    }},
+    "/api/routes/{id}/": {"get": {"operationId": "getRoute", "summary": "Read a saved result without routing calls", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}], "responses": {"200": {"description": "Saved trip", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Trip"}}}}, "404": {"description": "Trip not found"}}}},
+    "/api/health/": {"get": {"operationId": "health", "summary": "Django version and dataset coverage", "responses": {"200": {"description": "Ready"}, "503": {"description": "Import data first"}}}},
+    "/maps/{id}/": {"get": {"operationId": "routeMap", "summary": "Interactive Leaflet route map", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}], "responses": {"200": {"description": "HTML map viewer"}}}}
+  },
+  "components": {
+    "responses": {"BadRequest": {"description": "Invalid JSON, location, fuel amount or unknown field", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}},
+    "schemas": {
+      "Location": {"oneOf": [{"type": "string", "minLength": 3, "maxLength": 200, "examples": ["Chicago, IL", "Los Angeles, California"]}, {"type": "object", "additionalProperties": false, "required": ["latitude", "longitude"], "properties": {"latitude": {"type": "number", "minimum": -90, "maximum": 90}, "longitude": {"type": "number", "minimum": -180, "maximum": 180}}}]},
+      "RouteRequest": {"type": "object", "additionalProperties": false, "required": ["start", "finish"], "properties": {"start": {"$ref": "#/components/schemas/Location"}, "finish": {"$ref": "#/components/schemas/Location"}, "initial_fuel_gallons": {"type": "number", "minimum": 0, "maximum": 50, "default": 50}}},
+      "FuelStop": {"type": "object", "required": ["id", "name", "latitude", "longitude", "mile", "price_per_gallon", "gallons", "cost_usd", "arrival_gallons", "departure_gallons"], "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "address": {"type": "string"}, "city": {"type": "string"}, "state": {"type": "string"}, "latitude": {"type": "number"}, "longitude": {"type": "number"}, "mile": {"type": "number"}, "price_per_gallon": {"type": "string", "description": "Decimal USD/US gallon, full input precision"}, "gallons": {"type": "number"}, "cost_usd": {"type": "string", "pattern": "^[0-9]+\\.[0-9]{2}$"}, "arrival_gallons": {"type": "number", "minimum": 0, "maximum": 50}, "departure_gallons": {"type": "number", "minimum": 0, "maximum": 50}, "coordinate_source": {"type": "string"}}},
+      "Trip": {"type": "object", "required": ["id", "map_url", "route", "fuel_stops", "summary", "metrics", "assumptions", "warnings"], "properties": {
+        "id": {"type": "string", "format": "uuid"}, "map_url": {"type": "string", "format": "uri"},
+        "route": {"type": "object", "properties": {"distance_miles": {"type": "number"}, "duration_seconds": {"type": "number"}, "geometry": {"type": "object", "description": "GeoJSON LineString using [longitude, latitude] coordinates"}, "leg_miles": {"type": "array", "items": {"type": "number"}}}},
+        "fuel_stops": {"type": "array", "items": {"$ref": "#/components/schemas/FuelStop"}},
+        "summary": {"type": "object", "properties": {"total_cost_usd": {"type": "string", "description": "Sum of purchases; excludes the historical cost of fuel already in tank"}, "gallons_purchased": {"type": "number"}, "gallons_consumed": {"type": "number"}, "initial_gallons": {"type": "number"}, "arrival_gallons": {"type": "number"}, "stop_count": {"type": "integer"}, "additional_driving_miles": {"type": "number"}}},
+        "metrics": {"type": "object", "properties": {"routing_calls": {"type": "integer", "minimum": 0, "maximum": 3}, "route_cache_hits": {"type": "integer"}, "cache_hit": {"type": "boolean"}, "processing_ms": {"type": "number"}}},
+        "assumptions": {"type": "array", "items": {"type": "string"}}, "warnings": {"type": "array", "items": {"type": "string"}}, "dataset": {"type": "object"}
+      }},
+      "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "object", "required": ["code", "message", "details"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "details": {"type": "object"}}}}}
+    }
+  }
+}

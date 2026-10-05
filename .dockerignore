@@ -1,0 +1,9 @@
+.git
+.venv
+.uv-cache
+__pycache__
+*.sqlite3
+artifacts
+dist
+data/raw
+.env

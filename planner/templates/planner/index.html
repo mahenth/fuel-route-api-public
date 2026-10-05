@@ -1,0 +1,90 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#214d3d">
+  <meta name="description" content="Plan a US road trip and find cost-effective fuel stops along your route, with a 500-mile vehicle range.">
+  <title>Fuelwise — Go further. Spend less.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="{% static 'planner/app.css' %}">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script defer src="{% static 'planner/app.js' %}"></script>
+</head>
+<body data-trip-id="{{ trip_id|default:'' }}">
+  <a class="skip-link" href="#trip-form">Skip to trip planner</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Fuelwise home">
+      <svg class="brand-mark" width="38" height="38" viewBox="0 0 38 38" fill="none" aria-hidden="true"><rect width="38" height="38" rx="12" fill="currentColor"/><path d="M12 29 17 9h4l5 20M19 12v3m0 4v3m0 4v3" stroke="#F6F6EF" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>fuelwise<span class="brand-dot">.</span></span>
+    </a>
+    <nav class="header-nav" aria-label="Main navigation"><span class="nav-current">Trip planner</span><a href="#api-console">Explore the API <span aria-hidden="true">↗</span></a></nav>
+    <div class="header-note"><span class="small-dot"></span> Built for the open road</div>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">A LITTLE PLANNING. A LONG WAY.</p><h1 id="page-title">Go further. <span>Spend less.</span></h1><p class="intro-copy">Your route, with the right fuel stops along the way.</p></div>
+      <div class="intro-stamp"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M2 21h15M4 11h11M8 6h3M15 13h2a2 2 0 0 1 2 2v2a1.5 1.5 0 0 0 3 0V9l-4-4m2 2v4h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Fewer guesses.<br>Smarter fill-ups.</span></div>
+    </section>
+
+    <div class="planner-layout">
+      <aside class="planner-panel" aria-label="Trip settings and fuel stops">
+        <section class="form-section">
+          <div class="section-heading"><h2>Where are we headed?</h2><span class="step-label">01 / PLAN</span></div>
+          <form id="trip-form">
+            {% csrf_token %}
+            <div class="location-fields">
+              <div class="location-rail" aria-hidden="true"><span class="origin-dot"></span><span class="rail-line"></span><span class="destination-dot"></span></div>
+              <div class="location-inputs">
+                <label for="start">Starting point</label><input id="start" name="start" type="text" value="Chicago, IL" placeholder="City, ST" required maxlength="200" autocomplete="off">
+                <div class="input-divider"></div>
+                <label for="finish">Destination</label><input id="finish" name="finish" type="text" value="Los Angeles, CA" placeholder="City, ST" required maxlength="200" autocomplete="off">
+              </div>
+              <button id="swap-locations" class="swap-button" type="button" aria-label="Swap starting point and destination"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="vehicle-label"><span>Your vehicle</span><span>Fixed for this trip</span></div>
+            <div class="vehicle-specs"><div><strong>500 <small>mi</small></strong><span>Max. range</span></div><div><strong>10 <small>mpg</small></strong><span>Efficiency</span></div><div><strong>50 <small>gal</small></strong><span>Tank size</span></div></div>
+            <label class="fuel-select-label" for="initial-fuel">Fuel at departure <select id="initial-fuel" name="initial_fuel_gallons"><option value="50">Full tank · 50 gal</option><option value="25">Half tank · 25 gal</option><option value="10">10 gallons</option><option value="0">Empty tank</option></select></label>
+            <button class="primary-button" id="plan-button" type="submit"><span id="plan-button-label">Find my fuel stops</span><svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <p class="form-note" id="fuel-note">Starting fuel is already paid for. We calculate purchases along your route.</p>
+          </form>
+          <div id="error-message" class="error-message" role="alert" hidden></div>
+        </section>
+        <section id="empty-stops" class="empty-stops"><div class="empty-route-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><path d="M8 5h7a4 4 0 0 1 0 8H9a4 4 0 0 0 0 8h7"/></svg></div><h3>A good trip starts with a plan.</h3><p>Choose two US locations. We’ll map your drive and work out where to fill up.</p></section>
+        <section id="stops-section" class="stops-section" aria-labelledby="stops-title" hidden><div class="section-heading"><h2 id="stops-title">Your fuel stops</h2><span id="stop-count" class="count-pill">0 STOPS</span></div><p class="stops-help">Select a stop to find it on the map.</p><ol id="stops-list" class="stops-list"></ol><p id="no-stops" class="no-stops" hidden>Your starting fuel covers this drive. No fuel purchase needed.</p></section>
+        <div class="data-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></svg><span>Prices from the supplied fuel-price snapshot.</span></div>
+      </aside>
+
+      <section class="route-panel" aria-label="Route map and trip overview">
+        <div class="map-container">
+          <div id="map" role="region" aria-label="Interactive map of the route and fuel stops"></div>
+          <div id="map-unavailable" class="map-unavailable" hidden>Map tiles are unavailable. Route details and fuel stops are still shown below.</div>
+          <div class="map-topbar"><span class="map-badge"><span class="small-dot"></span><span id="map-title">THE OPEN ROAD AWAITS</span></span><button class="map-fit" id="fit-route" type="button" aria-label="Fit route to map" title="Fit route to map"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+          <div id="map-idle-note" class="map-idle-note"><span class="eyebrow">THE JOURNEY, OPTIMIZED</span><h2>Make every<br>mile count.</h2><p>One route. A thoughtful fuel plan.<br>A little more left for the adventure.</p><div class="idle-note-line"><span></span><span></span><span></span></div></div>
+          <div class="map-legend"><span><i class="legend-route"></i>Your route</span><span><i class="legend-stop"></i>Fuel stop</span></div>
+          <div id="map-loading" class="map-loading" hidden><span class="spinner"></span><strong>Finding your way…</strong><span>Mapping the road and comparing fuel stops.</span></div>
+        </div>
+        <div class="trip-overview" aria-live="polite" aria-atomic="true">
+          <div class="overview-heading"><div><p class="eyebrow">YOUR TRIP, AT A GLANCE</p><h2 id="trip-label">A clearer road ahead.</h2></div><a id="share-trip" class="share-link" href="#" hidden>Open saved map <span aria-hidden="true">↗</span></a></div>
+          <dl class="trip-stats"><div class="cost-stat"><dt>Fuel to purchase</dt><dd id="total-cost">—<span> USD</span></dd><p id="cost-caption">Excludes fuel already in your tank</p></div><div><dt>Total distance</dt><dd id="total-distance">—<span> mi</span></dd><p id="drive-time">Your route distance</p></div><div><dt>Fuel stops</dt><dd id="total-stops">—</dd><p id="gallons-caption">Planned around your range</p></div></dl>
+          <div class="overview-bottom"><span id="trip-status"><span class="small-dot"></span>Ready when you are</span><span class="range-note">500-mile range · 10 mpg</span></div>
+        </div>
+      </section>
+    </div>
+
+    <section id="trip-details" class="trip-details" hidden><details><summary>Trip assumptions &amp; data notes <span aria-hidden="true">+</span></summary><ul id="assumptions-list"></ul><ul id="warnings-list" class="warnings-list"></ul></details></section>
+
+    <details id="api-console" class="api-console"><summary><div><span class="api-icon" aria-hidden="true">{ }</span><span><strong>Under the hood</strong><small>Try the API and inspect the response.</small></span></div><span class="console-label">API EXPLORER <span aria-hidden="true">+</span></span></summary><div class="console-content"><div class="console-request"><div class="console-toolbar"><span><b>POST</b> /api/routes/</span><button type="button" id="run-api" class="small-button">Send request <span aria-hidden="true">↗</span></button></div><label class="sr-only" for="api-request">JSON request body</label><textarea id="api-request" spellcheck="false" rows="10">{
+  "start": "Chicago, IL",
+  "finish": "Los Angeles, CA",
+  "initial_fuel_gallons": 50
+}</textarea><p>Accepts US place names or <code>{"latitude": 41.8781, "longitude": -87.6298}</code>.</p></div><div class="console-response"><div class="console-toolbar"><span>Response <b id="response-status" class="response-status">NOT SENT</b></span><button class="small-button" type="button" id="download-response" disabled>Save JSON</button></div><pre id="api-response" tabindex="0" aria-label="API response">Send a request to see the complete route and fuel plan.</pre></div></div></details>
+  </main>
+  <footer class="site-footer"><span>Made for the miles ahead.</span><span>Routing by OSRM · Map data © OpenStreetMap contributors</span></footer>
+</body>
+</html>
