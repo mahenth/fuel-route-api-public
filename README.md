@@ -48,6 +48,7 @@ The import is atomic and repeatable. It validates rows, de-duplicates OPIS IDs u
 | Method | Endpoint | Result |
 | --- | --- | --- |
 | `POST` | `/api/routes/` | Create or retrieve a cached fuel plan |
+| `GET` | `/api/locations/?q=Chi` | Up to eight matching US cities for autocomplete |
 | `GET` | `/api/routes/<uuid>/` | Retrieve a saved plan |
 | `GET` | `/maps/<uuid>/` | Open the saved interactive map |
 | `GET` | `/api/health/` | Service and imported dataset status |
@@ -65,6 +66,8 @@ Content-Type: application/json
   "initial_fuel_gallons": 50
 }
 ```
+
+Both location fields suggest US cities as you type, starting with the first letter. Choose a suggestion with the mouse, touch, or the arrow keys and Enter; Escape closes the list. Suggestions use the local gazetteer and make no external geocoding or routing calls. A city prefix can include a state, such as `Port, OR` or `Port, Oregon`.
 
 Use `City, ST` for bundled US cities, or latitude/longitude objects for precise endpoints. Arbitrary street addresses are not geocoded. Either endpoint can use either representation:
 
@@ -173,7 +176,7 @@ python manage.py check
 python manage.py test tests
 ```
 
-Tests use mocked provider responses and deterministic station data, so they do not consume the public routing service. The 62 tests cover the optimizer against an independent exhaustive dynamic-programming oracle (243 pricing scenarios), fuel balance and capacity, route projection, city/coordinate validation, provider failures, verified detours, cache behavior, compact route decoding, data matching, and API error handling.
+Tests use mocked provider responses and deterministic station data, so they do not consume the public routing service. The 75 tests cover the optimizer against an independent exhaustive dynamic-programming oracle (243 pricing scenarios), fuel balance and capacity, route projection, city/coordinate validation, offline autocomplete and ranking, provider failures, verified detours, cache behavior, compact route decoding, data matching, and API error handling.
 
 With the server running, `python scripts/smoke_api.py` checks a real cross-country trip, its cached repeat, a short trip, and rejection of a Canadian endpoint. It validates tank capacity, reachability, fuel balance and the sum of all purchase charges. This optional live check uses the routing service; results are written into ignored `artifacts/` files.
 

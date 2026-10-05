@@ -10,6 +10,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 
 from .errors import APIError
+from .locations import suggest_cities
 from .models import Dataset, Trip
 from .service import plan_trip
 
@@ -79,6 +80,20 @@ def health(request):
     return JsonResponse({'status': 'ok' if dataset else 'setup_required',
                          'django_version': __import__('django').get_version(),
                          'dataset': dataset.summary if dataset else None}, status=200 if dataset else 503)
+
+
+def locations(request):
+    if request.method != 'GET':
+        response = error_response(APIError('method_not_allowed', 'Use GET for city suggestions.', 405))
+        response['Allow'] = 'GET'
+        return response
+    try:
+        response = JsonResponse({'results': suggest_cities(request.GET.get('q', ''))})
+    except APIError as exc:
+        return error_response(exc)
+    response['Cache-Control'] = 'public, max-age=86400'
+    response['X-Routing-Calls'] = '0'
+    return response
 
 
 def schema(request):

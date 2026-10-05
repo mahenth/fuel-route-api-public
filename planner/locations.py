@@ -2,6 +2,7 @@
 import json
 import math
 import unicodedata
+from bisect import bisect_left, bisect_right
 from functools import lru_cache
 
 import geonamescache
@@ -33,6 +34,65 @@ def city_index():
             if key not in result or city['population'] > result[key]['population']:
                 result[key] = city
     return result, state_names
+
+
+@lru_cache(maxsize=1)
+def city_suggestion_index():
+    """Index the same aliases accepted by routing, built once per process."""
+    cities, state_names = city_index()
+    entries = sorted(
+        ((alias, state, city) for (alias, state), city in cities.items()),
+        key=lambda entry: (entry[0], entry[1]),
+    )
+    return [entry[0] for entry in entries], entries, state_names
+
+
+def suggest_cities(query, limit=8):
+    """Return US city prefixes, ranked by exact match and population.
+
+    Search is entirely local. Prefix bounds avoid scanning the full gazetteer
+    on every keystroke, and aliases collapse to selectable canonical labels.
+    An optional comma-separated state prefix narrows ambiguous city names.
+    """
+    if not isinstance(query, str) or len(query) > 200:
+        raise APIError('invalid_query', 'City search must be at most 200 characters.')
+    parts = [normalize(part) for part in query.split(',')]
+    if not parts[0] or len(parts) > 2 or limit <= 0:
+        return []
+    prefix = parts[0]
+    names, entries, state_names = city_suggestion_index()
+    states = None
+    if len(parts) == 2 and parts[1]:
+        state_prefix = parts[1]
+        states = {code for name, code in state_names.items()
+                  if name.startswith(state_prefix) or code.casefold().startswith(state_prefix)}
+        if not states:
+            return []
+    left = bisect_left(names, prefix)
+    right = bisect_right(names, prefix + '\U0010ffff')
+    cities, _ = city_index()
+    matches = {}
+    for alias, state, city in entries[left:right]:
+        if states is not None and state not in states:
+            continue
+        # Same-name places within one state must resolve identically when the
+        # chosen label is subsequently submitted to the routing endpoint.
+        canonical = cities.get((normalize(city['name']), state))
+        if canonical is None:
+            continue
+        canonical_name = normalize(canonical['name'])
+        # Foreign-language transliterations often start with unrelated letters
+        # (e.g. a Houston alias starts with "Chi"). Match visible city prefixes;
+        # aliases are useful only when entered exactly, such as "NYC".
+        if not canonical_name.startswith(prefix) and (alias != prefix or len(prefix) < 2):
+            continue
+        label = f"{canonical['name']}, {state}"
+        rank = (alias != prefix, -canonical['population'], label.casefold())
+        result = {'label': label, 'city': canonical['name'], 'state': state}
+        if label not in matches or rank < matches[label][0]:
+            matches[label] = (rank, result)
+    ordered = sorted(matches.values(), key=lambda match: match[0])
+    return [result for _, result in ordered[:min(limit, 8)]]
 
 
 @lru_cache(maxsize=1)

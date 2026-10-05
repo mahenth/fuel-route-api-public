@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="{% static 'planner/app.css' %}">
+  <link rel="stylesheet" href="{% static 'planner/app.css' %}?v=2">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script defer src="{% static 'planner/app.js' %}"></script>
+  <script defer src="{% static 'planner/app.js' %}?v=2"></script>
 </head>
 <body data-trip-id="{{ trip_id|default:'' }}">
   <a class="skip-link" href="#trip-form">Skip to trip planner</a>
@@ -41,12 +41,20 @@
             <div class="location-fields">
               <div class="location-rail" aria-hidden="true"><span class="origin-dot"></span><span class="rail-line"></span><span class="destination-dot"></span></div>
               <div class="location-inputs">
-                <label for="start">Starting point</label><input id="start" name="start" type="text" value="Chicago, IL" placeholder="City, ST" required maxlength="200" autocomplete="off">
+                <div class="location-field">
+                  <label for="start">Starting point</label><input id="start" name="start" type="text" value="Chicago, IL" placeholder="Start typing a US city…" required maxlength="200" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="start-suggestions" aria-describedby="location-help">
+                  <div id="start-popup" class="location-popup" hidden><ul id="start-suggestions" class="location-suggestions" role="listbox" aria-label="Starting point city suggestions"></ul><p id="start-suggestion-message" class="location-suggestion-message" hidden></p></div>
+                </div>
                 <div class="input-divider"></div>
-                <label for="finish">Destination</label><input id="finish" name="finish" type="text" value="Los Angeles, CA" placeholder="City, ST" required maxlength="200" autocomplete="off">
+                <div class="location-field">
+                  <label for="finish">Destination</label><input id="finish" name="finish" type="text" value="Los Angeles, CA" placeholder="Start typing a US city…" required maxlength="200" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="finish-suggestions" aria-describedby="location-help">
+                  <div id="finish-popup" class="location-popup" hidden><ul id="finish-suggestions" class="location-suggestions" role="listbox" aria-label="Destination city suggestions"></ul><p id="finish-suggestion-message" class="location-suggestion-message" hidden></p></div>
+                </div>
               </div>
               <button id="swap-locations" class="swap-button" type="button" aria-label="Swap starting point and destination"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </div>
+            <p id="location-help" class="location-help">Choose a suggested city, or enter City, ST.</p>
+            <p id="location-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
             <div class="vehicle-label"><span>Your vehicle</span><span>Fixed for this trip</span></div>
             <div class="vehicle-specs"><div><strong>500 <small>mi</small></strong><span>Max. range</span></div><div><strong>10 <small>mpg</small></strong><span>Efficiency</span></div><div><strong>50 <small>gal</small></strong><span>Tank size</span></div></div>
             <label class="fuel-select-label" for="initial-fuel">Fuel at departure <select id="initial-fuel" name="initial_fuel_gallons"><option value="50">Full tank · 50 gal</option><option value="25">Half tank · 25 gal</option><option value="10">10 gallons</option><option value="0">Empty tank</option></select></label>
